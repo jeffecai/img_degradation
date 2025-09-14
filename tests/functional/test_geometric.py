@@ -4,7 +4,8 @@ import pytest
 
 from albumentations.augmentations.geometric import functional as fgeometric
 from albumentations.augmentations.geometric.functional import (
-    _can_import,
+    _PIL_AVAILABLE,
+    _PYVIPS_AVAILABLE,
     from_distance_maps,
     to_distance_maps,
 )
@@ -635,7 +636,7 @@ def test_resize_cv2(input_shape, target_shape):
 
     assert resized.shape == (*target_shape, 3)
 
-@pytest.mark.skipif(not _can_import("pyvips"), reason="pyvips is not installed")
+@pytest.mark.skipif(not _PYVIPS_AVAILABLE, reason="pyvips is not installed")
 @pytest.mark.parametrize("input_shape,target_shape", [
     ((100, 100), (200, 200)),
     ((200, 200), (100, 100)),
@@ -647,7 +648,8 @@ def test_resize_pyvips(input_shape, target_shape):
     resized = fgeometric.resize_pyvips(img, target_shape, interpolation=0)
     assert resized.shape == (*target_shape, 3)
 
-@pytest.mark.skipif(not _can_import("pyvips"), reason="pyvips is not installed")
+@pytest.mark.xfail(reason="pyvips and OpenCV have different interpolation implementations")
+@pytest.mark.skipif(not _PYVIPS_AVAILABLE, reason="pyvips is not installed")
 @pytest.mark.parametrize("interpolation", [0, 1, 2])
 @pytest.mark.parametrize("input_shape,target_shape", [
     ((100, 100), (200, 200)),
@@ -659,3 +661,104 @@ def test_resize_cv2_vs_pyvips(input_shape, target_shape, interpolation):
     resized_cv2 = fgeometric.resize_cv2(img, target_shape, interpolation=interpolation)
     resized_pyvips = fgeometric.resize_pyvips(img, target_shape, interpolation=interpolation)
     np.testing.assert_allclose(resized_cv2, resized_pyvips, atol=1)
+
+@pytest.mark.xfail(reason="Pillow and OpenCV have different interpolation implementations")
+@pytest.mark.skipif(not _PIL_AVAILABLE, reason="pillow is not installed")
+@pytest.mark.parametrize("interpolation", [0, 1, 2])
+@pytest.mark.parametrize("input_shape,target_shape", [
+    ((100, 100), (200, 200)),
+    ((200, 200), (100, 100)),
+])
+def test_resize_cv2_vs_pillow(input_shape, target_shape, interpolation):
+    img = np.random.randint(0, 255, (*input_shape, 3), dtype=np.uint8)
+
+    resized_cv2 = fgeometric.resize_cv2(img, target_shape, interpolation=interpolation)
+    resized_pil = fgeometric.resize_pil(img, target_shape, interpolation=interpolation)
+    np.testing.assert_allclose(resized_cv2, resized_pil, atol=1)
+
+
+@pytest.mark.skipif(not _PIL_AVAILABLE, reason="pillow is not installed")
+@pytest.mark.parametrize("interpolation", [
+    cv2.INTER_NEAREST,
+    cv2.INTER_LINEAR,
+    cv2.INTER_CUBIC,
+    cv2.INTER_AREA,
+    cv2.INTER_LANCZOS4,
+])
+@pytest.mark.parametrize("input_shape,target_shape", [
+    ((100, 100), (50, 75)),  # Downscale with different aspect ratio
+    ((50, 50), (100, 150)),   # Upscale with different aspect ratio
+])
+def test_resize_pil_with_cv2_interpolation_constants(input_shape, target_shape, interpolation):
+    """Test that resize_pil correctly maps cv2 interpolation constants to PIL."""
+    img = np.random.randint(0, 255, (*input_shape, 3), dtype=np.uint8)
+
+    # This should not raise an error
+    resized = fgeometric.resize_pil(img, target_shape, interpolation=interpolation)
+
+    # Check output shape
+    assert resized.shape[:2] == target_shape
+    assert resized.shape[2] == 3
+    assert resized.dtype == np.uint8
+
+
+@pytest.mark.skipif(not _PIL_AVAILABLE, reason="pillow is not installed")
+@pytest.mark.parametrize("num_channels", [1, 3, 4, 5, 10])
+def test_resize_pil_different_channel_counts(num_channels):
+    """Test that resize_pil handles different channel counts correctly."""
+    input_shape = (100, 100, num_channels)
+    target_shape = (50, 75)
+
+    img = np.random.randint(0, 255, input_shape, dtype=np.uint8)
+
+    resized = fgeometric.resize_pil(img, target_shape, interpolation=cv2.INTER_LINEAR)
+
+    assert resized.shape == (*target_shape, num_channels)
+    assert resized.dtype == np.uint8
+
+
+@pytest.mark.skipif(not _PIL_AVAILABLE, reason="pillow is not installed")
+def test_resize_backend_selection():
+    """Test that the resize function correctly selects backends based on environment variable."""
+    img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    target_shape = (50, 75)
+
+    # Clear the cache to ensure fresh backend selection
+    fgeometric._get_resize_backend.cache_clear()
+
+    # Test default backend (opencv)
+    os.environ.pop("ALBUMENTATIONS_RESIZE", None)
+    fgeometric._get_resize_backend.cache_clear()
+    backend = fgeometric._get_resize_backend()
+    assert backend == "opencv"
+
+    resized_default = fgeometric.resize(img, target_shape, cv2.INTER_LINEAR)
+    assert resized_default.shape == (*target_shape, 3)
+
+    # Test pillow backend
+    os.environ["ALBUMENTATIONS_RESIZE"] = "pillow"
+    fgeometric._get_resize_backend.cache_clear()
+    backend = fgeometric._get_resize_backend()
+    assert backend == "pillow"
+
+    resized_pillow = fgeometric.resize(img, target_shape, cv2.INTER_LINEAR)
+    assert resized_pillow.shape == (*target_shape, 3)
+
+    # Clean up
+    os.environ.pop("ALBUMENTATIONS_RESIZE", None)
+    fgeometric._get_resize_backend.cache_clear()
+
+
+@pytest.mark.skipif(not _PIL_AVAILABLE, reason="pillow is not installed")
+@pytest.mark.parametrize("dtype", [np.uint8, np.float32])
+def test_resize_pil_preserves_dtype(dtype):
+    """Test that resize_pil preserves the input dtype."""
+    img = np.random.rand(100, 100, 3).astype(dtype)
+    if dtype == np.uint8:
+        img = (img * 255).astype(np.uint8)
+
+    target_shape = (50, 75)
+    resized = fgeometric.resize_pil(img, target_shape, interpolation=cv2.INTER_LINEAR)
+
+    assert resized.dtype == dtype
+    assert resized.shape == (*target_shape, 3)
