@@ -1250,8 +1250,9 @@ class DegradationGUI:
         save_dir = os.path.dirname(self.current_image_path)
         base_name = os.path.splitext(os.path.basename(self.current_image_path))[0]
         
-        # 创建子目录（使用图像名作为目录名）
-        output_dir = os.path.join(save_dir, base_name)
+        # 创建子目录结构：图像名目录/算法英文名子目录
+        image_dir = os.path.join(save_dir, base_name)
+        output_dir = os.path.join(image_dir, algorithm_name)  # 使用算法英文名作为子目录
         os.makedirs(output_dir, exist_ok=True)
         
         # 生成并保存样本
