@@ -4,7 +4,7 @@
 
 ## 功能特点
 
-- 📸 支持18种不同的退化算法
+- 📸 支持33种不同的退化算法
 - 🎛️ 实时参数调节和预览
 - 👁️ 左右对比显示原图和效果图
 - 💾 支持保存处理结果
@@ -31,6 +31,19 @@
 - MedianBlur - 中值模糊
 - GlassBlur - 玻璃模糊
 - Defocus - 散焦模糊
+
+### Dropout类退化
+- CoarseDropout - 粗粒度区域丢弃
+- GridDropout - 网格模式丢弃
+- PixelDropout - 像素级丢弃
+- ChannelDropout - 通道丢弃
+
+### 几何畸变退化
+- ElasticTransform - 弹性变形
+- GridDistortion - 网格畸变
+- OpticalDistortion - 光学畸变（镜头畸变）
+- PiecewiseAffine - 分段仿射变形
+- ThinPlateSpline - 薄板样条变形
 
 ### 其他退化
 - Dithering - 抖动算法
