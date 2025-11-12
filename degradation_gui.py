@@ -1281,28 +1281,122 @@ class DegradationGUI:
             
             progress_window.update()
             
+            # 分离连续参数和离散参数
+            continuous_params = {}  # 连续参数（range类型）
+            discrete_params = {}     # 离散参数（range_int, choice, bool类型）
+            
+            for param_name, param_value in range_params.items():
+                if isinstance(param_value, tuple):
+                    # 检查参数类型
+                    param_config = algorithm_config["params"].get(param_name, {})
+                    param_type = param_config.get("type", "range")
+                    
+                    if param_type == "range":
+                        # 连续参数
+                        continuous_params[param_name] = param_value
+                    else:
+                        # 离散参数（range_int）
+                        discrete_params[param_name] = param_value
+                else:
+                    # 固定参数（choice, bool）
+                    discrete_params[param_name] = param_value
+            
+            # 使用拉丁超立方采样生成连续参数的样本
+            continuous_param_names = list(continuous_params.keys())
+            continuous_samples = None
+            
+            if len(continuous_param_names) > 0:
+                # 生成拉丁超立方采样（LHS）
+                # LHS确保每个参数维度都被均匀覆盖
+                n_continuous = len(continuous_param_names)
+                
+                # 生成LHS样本矩阵 (sample_count x n_continuous)
+                # 每个参数维度被分成sample_count个区间，每个样本在每个区间中随机采样
+                lhs_samples = np.zeros((sample_count, n_continuous))
+                
+                for i in range(n_continuous):
+                    param_name = continuous_param_names[i]
+                    min_val, max_val = continuous_params[param_name]
+                    
+                    # 将参数范围分成sample_count个区间
+                    intervals = np.linspace(min_val, max_val, sample_count + 1)
+                    
+                    # 为每个样本在对应区间中随机采样
+                    for j in range(sample_count):
+                        lhs_samples[j, i] = np.random.uniform(intervals[j], intervals[j + 1])
+                
+                # 随机打乱每列的顺序，确保LHS的随机性
+                for i in range(n_continuous):
+                    np.random.shuffle(lhs_samples[:, i])
+                
+                continuous_samples = lhs_samples
+            
+            # 用于去重的集合（存储参数组合的哈希值）
+            seen_param_combinations = set()
             saved_count = 0
-            for i in range(sample_count):
+            max_attempts = sample_count * 10  # 最大尝试次数，避免无限循环
+            attempt_count = 0
+            
+            while saved_count < sample_count and attempt_count < max_attempts:
+                attempt_count += 1
+                
                 # 生成随机参数
                 random_params = {}
                 param_values_for_filename = {}  # 用于文件名的参数值
-                for param_name, param_value in range_params.items():
+                
+                # 处理连续参数（使用LHS采样）
+                if continuous_samples is not None:
+                    sample_idx = saved_count % sample_count  # 循环使用LHS样本
+                    for i, param_name in enumerate(continuous_param_names):
+                        random_val = float(continuous_samples[sample_idx, i])
+                        min_val, max_val = continuous_params[param_name]
+                        # 确保在范围内
+                        random_val = max(min_val, min(max_val, random_val))
+                        random_params[param_name] = (random_val, random_val)
+                        param_values_for_filename[param_name] = random_val
+                
+                # 处理离散参数（均匀随机采样）
+                for param_name, param_value in discrete_params.items():
                     if isinstance(param_value, tuple):
-                        # 范围参数：随机选择
+                        # 范围参数（range_int）
                         min_val, max_val = param_value
-                        if isinstance(min_val, int):
-                            random_val = np.random.randint(int(min_val), int(max_val) + 1)
-                            # 对于blur_limit，确保是奇数
-                            if "blur" in param_name.lower() and random_val % 2 == 0:
-                                random_val += 1
-                        else:
-                            random_val = np.random.uniform(min_val, max_val)
+                        random_val = np.random.randint(int(min_val), int(max_val) + 1)
+                        # 对于blur_limit，确保是奇数
+                        if "blur" in param_name.lower() and random_val % 2 == 0:
+                            random_val += 1
                         random_params[param_name] = (random_val, random_val)
                         param_values_for_filename[param_name] = random_val
                     else:
                         # 固定参数
                         random_params[param_name] = param_value
                         param_values_for_filename[param_name] = param_value
+                
+                # 生成参数组合的哈希值用于去重
+                # 将参数值转换为可哈希的元组，对浮点数进行适当舍入以避免精度问题
+                def normalize_value(v):
+                    """标准化参数值用于去重"""
+                    if isinstance(v, tuple):
+                        v = v[0]
+                    if isinstance(v, (float, np.floating)):
+                        # 浮点数保留4位小数，避免精度问题导致的重复
+                        return round(float(v), 4)
+                    elif isinstance(v, (int, np.integer)):
+                        return int(v)
+                    elif isinstance(v, bool):
+                        return bool(v)
+                    else:
+                        return str(v)
+                
+                param_tuple = tuple(sorted((k, normalize_value(v)) 
+                                          for k, v in param_values_for_filename.items()))
+                param_hash = hash(param_tuple)
+                
+                # 检查是否重复
+                if param_hash in seen_param_combinations:
+                    continue  # 跳过重复的参数组合
+                
+                # 记录这个参数组合
+                seen_param_combinations.add(param_hash)
                 
                 # 创建变换对象
                 transform = algorithm_class(p=1.0, **random_params)
@@ -1386,9 +1480,17 @@ class DegradationGUI:
                 saved_count += 1
                 
                 # 更新进度
-                progress_var.set(i + 1)
-                progress_label.config(text=f"正在生成样本... ({i+1}/{sample_count})")
+                progress_var.set(saved_count)
+                progress_label.config(text=f"正在生成样本... ({saved_count}/{sample_count})")
                 progress_window.update()
+            
+            # 检查是否成功生成足够的样本
+            if saved_count < sample_count:
+                messagebox.showwarning(
+                    "警告",
+                    f"由于参数空间限制，只生成了 {saved_count} 个唯一样本（请求 {sample_count} 个）。\n"
+                    f"这可能是因为参数范围太小或离散参数组合有限。"
+                )
             
             progress_window.destroy()
             messagebox.showinfo(
