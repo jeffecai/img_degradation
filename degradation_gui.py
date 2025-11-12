@@ -23,6 +23,8 @@ class DegradationGUI:
         self.original_image = None
         self.original_image_rgb = None
         self.current_result = None
+        self.current_image_path = None  # 存储当前图片路径
+        self.range_param_vars = {}  # 存储参数范围输入框的变量
         
         # 创建界面
         self.create_widgets()
@@ -82,6 +84,43 @@ class DegradationGUI:
             text="应用算法", 
             command=self.apply_algorithm
         ).pack(fill=tk.X, pady=(10, 0))
+        
+        # 批量生成区域
+        batch_frame = ttk.LabelFrame(control_panel, text="批量生成随机样本", padding="5")
+        batch_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        # 样本数量输入
+        ttk.Label(batch_frame, text="样本数量:").pack(anchor=tk.W, pady=(0, 2))
+        self.sample_count_var = tk.StringVar(value="10")
+        sample_count_entry = ttk.Entry(batch_frame, textvariable=self.sample_count_var, width=15)
+        sample_count_entry.pack(fill=tk.X, pady=(0, 5))
+        
+        # 参数范围设置区域（滚动区域）
+        range_scroll_frame = ttk.Frame(batch_frame)
+        range_scroll_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 创建滚动条
+        range_canvas = tk.Canvas(range_scroll_frame, height=150)
+        range_scrollbar = ttk.Scrollbar(range_scroll_frame, orient="vertical", command=range_canvas.yview)
+        self.range_params_frame = ttk.Frame(range_canvas)
+        
+        self.range_params_frame.bind(
+            "<Configure>",
+            lambda e: range_canvas.configure(scrollregion=range_canvas.bbox("all"))
+        )
+        
+        range_canvas.create_window((0, 0), window=self.range_params_frame, anchor="nw")
+        range_canvas.configure(yscrollcommand=range_scrollbar.set)
+        
+        range_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        range_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 保存范围随机结果按钮
+        ttk.Button(
+            batch_frame, 
+            text="保存范围随机结果", 
+            command=self.save_random_samples
+        ).pack(fill=tk.X, pady=(5, 0))
         
         # 右侧：图片显示区域
         display_frame = ttk.Frame(main_container)
@@ -659,9 +698,17 @@ class DegradationGUI:
         # 清除旧的参数控件
         for widget in self.param_frame.winfo_children():
             widget.destroy()
+        
+        # 清除旧的参数范围控件
+        for widget in self.range_params_frame.winfo_children():
+            widget.destroy()
+        self.range_param_vars = {}
             
         algorithm_config = self.algorithms[algorithm_name]
         self.param_vars = {}
+        
+        # 创建参数范围输入控件
+        self.create_range_inputs(algorithm_config)
         
         # 创建参数控件
         for param_name, param_config in algorithm_config["params"].items():
@@ -791,6 +838,57 @@ class DegradationGUI:
                 check.pack(anchor=tk.W, pady=2)
                 self.param_vars[param_name] = var
     
+    def create_range_inputs(self, algorithm_config):
+        """为批量生成创建参数范围输入控件"""
+        for param_name, param_config in algorithm_config["params"].items():
+            param_type = param_config["type"]
+            param_label = param_config.get("label", param_name)
+            param_default = param_config.get("default")
+            
+            # 只对range和range_int类型创建范围输入
+            if param_type in ["range", "range_int"]:
+                # 获取默认值
+                if isinstance(param_default, tuple):
+                    default_min = param_default[0]
+                    default_max = param_default[1]
+                else:
+                    default_min = param_default
+                    default_max = param_default
+                
+                # 如果默认是单个值，设置一个合理的范围
+                if default_min == default_max:
+                    if param_type == "range_int":
+                        default_min = max(param_config["min"], int(default_min) - 2)
+                        default_max = min(param_config["max"], int(default_max) + 2)
+                    else:
+                        range_size = (param_config["max"] - param_config["min"]) * 0.1
+                        default_min = max(param_config["min"], default_min - range_size)
+                        default_max = min(param_config["max"], default_max + range_size)
+                
+                # 参数标签
+                param_frame = ttk.Frame(self.range_params_frame)
+                param_frame.pack(fill=tk.X, pady=2)
+                
+                ttk.Label(param_frame, text=param_label + ":", width=15).pack(side=tk.LEFT, padx=(0, 5))
+                
+                # 最小值输入
+                ttk.Label(param_frame, text="最小:", width=5).pack(side=tk.LEFT)
+                var_min = tk.StringVar(value=str(default_min))
+                entry_min = ttk.Entry(param_frame, textvariable=var_min, width=8)
+                entry_min.pack(side=tk.LEFT, padx=2)
+                
+                # 最大值输入
+                ttk.Label(param_frame, text="最大:", width=5).pack(side=tk.LEFT)
+                var_max = tk.StringVar(value=str(default_max))
+                entry_max = ttk.Entry(param_frame, textvariable=var_max, width=8)
+                entry_max.pack(side=tk.LEFT, padx=2)
+                
+                self.range_param_vars[param_name] = {
+                    "min": var_min,
+                    "max": var_max,
+                    "type": param_type
+                }
+    
     def load_image(self):
         """加载图片"""
         file_path = filedialog.askopenfilename(
@@ -814,6 +912,7 @@ class DegradationGUI:
             # 转换为RGB
             self.original_image_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             self.original_image = img_bgr
+            self.current_image_path = file_path  # 保存图片路径
             
             # 显示原图
             self.display_image(self.original_image_rgb, self.original_canvas)
@@ -1060,6 +1159,187 @@ class DegradationGUI:
             
         except Exception as e:
             messagebox.showerror("错误", f"保存图片失败: {str(e)}")
+    
+    def save_random_samples(self):
+        """保存范围随机结果"""
+        if self.original_image_rgb is None:
+            messagebox.showwarning("警告", "请先加载一张图片")
+            return
+        
+        if self.current_image_path is None:
+            messagebox.showwarning("警告", "无法确定保存目录，请重新加载图片")
+            return
+        
+        try:
+            # 获取样本数量
+            sample_count = int(self.sample_count_var.get())
+            if sample_count <= 0:
+                messagebox.showerror("错误", "样本数量必须大于0")
+                return
+            if sample_count > 1000:
+                if not messagebox.askyesno("确认", f"将生成{sample_count}个样本，可能需要较长时间，是否继续？"):
+                    return
+        except ValueError:
+            messagebox.showerror("错误", "样本数量必须是整数")
+            return
+        
+        algorithm_name = self.algorithm_var.get()
+        if algorithm_name not in self.algorithms:
+            messagebox.showerror("错误", "未知的算法")
+            return
+        
+        algorithm_config = self.algorithms[algorithm_name]
+        
+        # 获取参数范围
+        range_params = {}
+        for param_name, param_config in algorithm_config["params"].items():
+            param_type = param_config["type"]
+            
+            if param_type in ["range", "range_int"]:
+                if param_name not in self.range_param_vars:
+                    continue
+                
+                try:
+                    var_min = self.range_param_vars[param_name]["min"]
+                    var_max = self.range_param_vars[param_name]["max"]
+                    
+                    min_val = float(var_min.get())
+                    max_val = float(var_max.get())
+                    
+                    # 验证范围
+                    if min_val > max_val:
+                        min_val, max_val = max_val, min_val
+                    
+                    # 确保在有效范围内
+                    min_val = max(param_config["min"], min_val)
+                    max_val = min(param_config["max"], max_val)
+                    
+                    if param_type == "range_int":
+                        min_val = int(min_val)
+                        max_val = int(max_val)
+                        # 对于blur_limit，确保是奇数
+                        if "blur" in param_name.lower():
+                            if min_val % 2 == 0:
+                                min_val += 1
+                            if max_val % 2 == 0:
+                                max_val += 1
+                        range_params[param_name] = (min_val, max_val)
+                    else:
+                        range_params[param_name] = (float(min_val), float(max_val))
+                        
+                except ValueError:
+                    messagebox.showerror("错误", f"参数 {param_name} 的范围值无效")
+                    return
+            elif param_type == "choice":
+                # 选择类型使用当前值
+                if param_name in self.param_vars:
+                    range_params[param_name] = self.param_vars[param_name].get()
+            elif param_type == "bool":
+                # 布尔类型使用当前值
+                if param_name in self.param_vars:
+                    range_params[param_name] = self.param_vars[param_name].get()
+        
+        # 获取保存目录
+        import os
+        save_dir = os.path.dirname(self.current_image_path)
+        base_name = os.path.splitext(os.path.basename(self.current_image_path))[0]
+        algorithm_display_name = self.algorithm_names.get(algorithm_name, algorithm_name)
+        algorithm_safe_name = algorithm_name  # 使用内部名称作为文件夹名
+        
+        # 创建子目录
+        output_dir = os.path.join(save_dir, f"{base_name}_{algorithm_safe_name}_samples")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 生成并保存样本
+        algorithm_class = algorithm_config["class"]
+        progress_window = None
+        
+        try:
+            # 创建进度窗口
+            progress_window = tk.Toplevel(self.root)
+            progress_window.title("生成进度")
+            progress_window.geometry("400x100")
+            progress_window.transient(self.root)
+            progress_window.grab_set()
+            
+            progress_label = ttk.Label(progress_window, text="正在生成样本...")
+            progress_label.pack(pady=10)
+            
+            progress_var = tk.DoubleVar()
+            progress_bar = ttk.Progressbar(
+                progress_window,
+                variable=progress_var,
+                maximum=sample_count,
+                length=350
+            )
+            progress_bar.pack(pady=10)
+            
+            progress_window.update()
+            
+            saved_count = 0
+            for i in range(sample_count):
+                # 生成随机参数
+                random_params = {}
+                for param_name, param_value in range_params.items():
+                    if isinstance(param_value, tuple):
+                        # 范围参数：随机选择
+                        min_val, max_val = param_value
+                        if isinstance(min_val, int):
+                            random_val = np.random.randint(int(min_val), int(max_val) + 1)
+                        else:
+                            random_val = np.random.uniform(min_val, max_val)
+                        random_params[param_name] = (random_val, random_val)
+                    else:
+                        # 固定参数
+                        random_params[param_name] = param_value
+                
+                # 创建变换对象
+                transform = algorithm_class(p=1.0, **random_params)
+                
+                # 应用变换
+                result = transform(image=self.original_image_rgb)
+                result_image = result["image"]
+                
+                # 确保结果是numpy数组
+                if not isinstance(result_image, np.ndarray):
+                    result_image = np.array(result_image)
+                
+                # 确保是RGB格式
+                if len(result_image.shape) == 2:
+                    result_image = cv2.cvtColor(result_image, cv2.COLOR_GRAY2RGB)
+                elif result_image.shape[2] == 4:
+                    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGBA2RGB)
+                
+                # 保存图片
+                filename = f"{base_name}_{algorithm_safe_name}_{i+1:04d}.png"
+                filepath = os.path.join(output_dir, filename)
+                
+                # 转换为BGR格式保存
+                if len(result_image.shape) == 3:
+                    result_bgr = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+                else:
+                    result_bgr = result_image
+                
+                cv2.imwrite(filepath, result_bgr)
+                saved_count += 1
+                
+                # 更新进度
+                progress_var.set(i + 1)
+                progress_label.config(text=f"正在生成样本... ({i+1}/{sample_count})")
+                progress_window.update()
+            
+            progress_window.destroy()
+            messagebox.showinfo(
+                "成功", 
+                f"已成功生成并保存 {saved_count} 个样本到:\n{output_dir}"
+            )
+            
+        except Exception as e:
+            if progress_window:
+                progress_window.destroy()
+            messagebox.showerror("错误", f"生成样本失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 
 def main():
