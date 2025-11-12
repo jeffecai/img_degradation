@@ -217,6 +217,74 @@ class DegradationGUI:
                     "shift_x": {"type": "range_int", "min": -10, "max": 10, "default": (-5, 5), "label": "X偏移"},
                     "shift_y": {"type": "range_int", "min": -10, "max": 10, "default": (-5, 5), "label": "Y偏移"}
                 }
+            },
+            # Dropout类退化算法
+            "CoarseDropout": {
+                "class": A.CoarseDropout,
+                "params": {
+                    "num_holes_range": {"type": "range_int", "min": 1, "max": 10, "default": (1, 5), "label": "空洞数量"},
+                    "hole_height_range": {"type": "range", "min": 0.05, "max": 0.5, "default": (0.1, 0.2), "label": "空洞高度(比例)"},
+                    "hole_width_range": {"type": "range", "min": 0.05, "max": 0.5, "default": (0.1, 0.2), "label": "空洞宽度(比例)"}
+                }
+            },
+            "GridDropout": {
+                "class": A.GridDropout,
+                "params": {
+                    "ratio": {"type": "range", "min": 0.1, "max": 0.9, "default": (0.3, 0.6), "label": "空洞比例"},
+                    "unit_size_range": {"type": "range_int", "min": 5, "max": 50, "default": (10, 30), "label": "网格单元大小"},
+                    "random_offset": {"type": "bool", "default": True, "label": "随机偏移"}
+                }
+            },
+            "PixelDropout": {
+                "class": A.PixelDropout,
+                "params": {
+                    "dropout_prob": {"type": "range", "min": 0.01, "max": 0.3, "default": (0.01, 0.1), "label": "像素丢弃概率"},
+                    "per_channel": {"type": "bool", "default": False, "label": "每通道独立"}
+                }
+            },
+            "ChannelDropout": {
+                "class": A.ChannelDropout,
+                "params": {
+                    "channel_drop_range": {"type": "range_int", "min": 1, "max": 3, "default": (1, 2), "label": "丢弃通道数"},
+                    "fill": {"type": "range", "min": 0.0, "max": 255.0, "default": (0.0, 0.0), "label": "填充值"}
+                }
+            },
+            # 几何畸变类退化算法
+            "ElasticTransform": {
+                "class": A.ElasticTransform,
+                "params": {
+                    "alpha": {"type": "range", "min": 1.0, "max": 200.0, "default": (50.0, 150.0), "label": "弹性强度"},
+                    "sigma": {"type": "range", "min": 1.0, "max": 100.0, "default": (5.0, 15.0), "label": "平滑度"}
+                }
+            },
+            "GridDistortion": {
+                "class": A.GridDistortion,
+                "params": {
+                    "num_steps": {"type": "range_int", "min": 3, "max": 15, "default": (5, 10), "label": "网格步数"},
+                    "distort_limit": {"type": "range", "min": 0.0, "max": 0.5, "default": (0.1, 0.3), "label": "畸变强度"}
+                }
+            },
+            "OpticalDistortion": {
+                "class": A.OpticalDistortion,
+                "params": {
+                    "distort_limit": {"type": "range", "min": 0.0, "max": 0.5, "default": (0.05, 0.2), "label": "畸变强度"},
+                    "shift_limit": {"type": "range", "min": 0.0, "max": 0.2, "default": (0.0, 0.1), "label": "偏移强度"}
+                }
+            },
+            "PiecewiseAffine": {
+                "class": A.PiecewiseAffine,
+                "params": {
+                    "scale": {"type": "range", "min": 0.01, "max": 0.1, "default": (0.03, 0.05), "label": "变形强度"},
+                    "nb_rows": {"type": "range_int", "min": 3, "max": 10, "default": (4, 6), "label": "网格行数"},
+                    "nb_cols": {"type": "range_int", "min": 3, "max": 10, "default": (4, 6), "label": "网格列数"}
+                }
+            },
+            "ThinPlateSpline": {
+                "class": A.ThinPlateSpline,
+                "params": {
+                    "scale": {"type": "range", "min": 0.01, "max": 0.1, "default": (0.03, 0.05), "label": "变形强度"},
+                    "nb_points": {"type": "range_int", "min": 3, "max": 20, "default": (5, 10), "label": "控制点数"}
+                }
             }
         }
         
