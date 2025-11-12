@@ -1283,7 +1283,8 @@ class DegradationGUI:
             
             # 分离连续参数和离散参数
             continuous_params = {}  # 连续参数（range类型）
-            discrete_params = {}     # 离散参数（range_int, choice, bool类型）
+            discrete_int_params = {}  # 离散整数参数（range_int类型）
+            discrete_fixed_params = {}  # 固定参数（choice, bool类型）
             
             for param_name, param_value in range_params.items():
                 if isinstance(param_value, tuple):
@@ -1296,10 +1297,10 @@ class DegradationGUI:
                         continuous_params[param_name] = param_value
                     else:
                         # 离散参数（range_int）
-                        discrete_params[param_name] = param_value
+                        discrete_int_params[param_name] = param_value
                 else:
                     # 固定参数（choice, bool）
-                    discrete_params[param_name] = param_value
+                    discrete_fixed_params[param_name] = param_value
             
             # 使用拉丁超立方采样生成连续参数的样本
             continuous_param_names = list(continuous_params.keys())
@@ -1331,6 +1332,59 @@ class DegradationGUI:
                 
                 continuous_samples = lhs_samples
             
+            # 使用类似LHS的策略生成整数参数的样本
+            discrete_int_param_names = list(discrete_int_params.keys())
+            discrete_int_samples = None
+            
+            if len(discrete_int_param_names) > 0:
+                n_discrete_int = len(discrete_int_param_names)
+                discrete_int_samples_matrix = np.zeros((sample_count, n_discrete_int), dtype=int)
+                
+                for i in range(n_discrete_int):
+                    param_name = discrete_int_param_names[i]
+                    min_val, max_val = discrete_int_params[param_name]
+                    min_val = int(min_val)
+                    max_val = int(max_val)
+                    
+                    # 计算可用的整数值数量
+                    num_values = max_val - min_val + 1
+                    
+                    if num_values <= sample_count:
+                        # 如果整数值数量少于样本数，确保每个值至少出现一次
+                        # 重复采样直到达到sample_count个
+                        values = np.arange(min_val, max_val + 1)
+                        # 确保每个值至少出现一次
+                        repeated_values = np.tile(values, (sample_count // num_values + 1))[:sample_count]
+                        np.random.shuffle(repeated_values)
+                        discrete_int_samples_matrix[:, i] = repeated_values
+                    else:
+                        # 如果整数值数量多于样本数，使用类似LHS的策略
+                        # 将范围分成sample_count个区间，每个区间随机选择一个整数值
+                        intervals = np.linspace(min_val, max_val, sample_count + 1)
+                        for j in range(sample_count):
+                            interval_min = int(np.ceil(intervals[j]))
+                            interval_max = int(np.floor(intervals[j + 1]))
+                            if interval_min <= interval_max:
+                                discrete_int_samples_matrix[j, i] = np.random.randint(interval_min, interval_max + 1)
+                            else:
+                                discrete_int_samples_matrix[j, i] = int(round(intervals[j]))
+                        
+                        # 对于blur_limit等需要奇数的参数，确保是奇数
+                        if "blur" in param_name.lower():
+                            for j in range(sample_count):
+                                if discrete_int_samples_matrix[j, i] % 2 == 0:
+                                    # 如果是偶数，随机选择加1或减1（但要确保在范围内）
+                                    if discrete_int_samples_matrix[j, i] + 1 <= max_val:
+                                        discrete_int_samples_matrix[j, i] += 1
+                                    elif discrete_int_samples_matrix[j, i] - 1 >= min_val:
+                                        discrete_int_samples_matrix[j, i] -= 1
+                
+                # 随机打乱每列的顺序
+                for i in range(n_discrete_int):
+                    np.random.shuffle(discrete_int_samples_matrix[:, i])
+                
+                discrete_int_samples = discrete_int_samples_matrix
+            
             # 用于去重的集合（存储参数组合的哈希值）
             seen_param_combinations = set()
             saved_count = 0
@@ -1355,21 +1409,18 @@ class DegradationGUI:
                         random_params[param_name] = (random_val, random_val)
                         param_values_for_filename[param_name] = random_val
                 
-                # 处理离散参数（均匀随机采样）
-                for param_name, param_value in discrete_params.items():
-                    if isinstance(param_value, tuple):
-                        # 范围参数（range_int）
-                        min_val, max_val = param_value
-                        random_val = np.random.randint(int(min_val), int(max_val) + 1)
-                        # 对于blur_limit，确保是奇数
-                        if "blur" in param_name.lower() and random_val % 2 == 0:
-                            random_val += 1
+                # 处理离散整数参数（使用改进的采样策略）
+                if discrete_int_samples is not None:
+                    sample_idx = saved_count % sample_count  # 循环使用采样样本
+                    for i, param_name in enumerate(discrete_int_param_names):
+                        random_val = int(discrete_int_samples[sample_idx, i])
                         random_params[param_name] = (random_val, random_val)
                         param_values_for_filename[param_name] = random_val
-                    else:
-                        # 固定参数
-                        random_params[param_name] = param_value
-                        param_values_for_filename[param_name] = param_value
+                
+                # 处理固定参数（choice, bool）
+                for param_name, param_value in discrete_fixed_params.items():
+                    random_params[param_name] = param_value
+                    param_values_for_filename[param_name] = param_value
                 
                 # 生成参数组合的哈希值用于去重
                 # 将参数值转换为可哈希的元组，对浮点数进行适当舍入以避免精度问题
@@ -1431,8 +1482,8 @@ class DegradationGUI:
                     if isinstance(param_val, (int, np.integer)):
                         param_str = f"{param_label}({int(param_val)})"
                     elif isinstance(param_val, (float, np.floating)):
-                        # 浮点数保留2位小数，去除末尾的0
-                        param_str = f"{param_label}({param_val:.2f})".rstrip('0').rstrip('.')
+                        # 浮点数保留3位小数，去除末尾的0
+                        param_str = f"{param_label}({param_val:.3f})".rstrip('0').rstrip('.')
                     elif isinstance(param_val, bool):
                         param_str = f"{param_label}({str(param_val)})"
                     else:
