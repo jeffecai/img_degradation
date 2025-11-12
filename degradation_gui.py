@@ -429,19 +429,19 @@ class DegradationGUI:
             },
             "distort_limit": {
                 "name": "畸变强度",
-                "description": "控制畸变的强度。值越大，图像扭曲越明显。",
-                "effect_up": "值增大 → 扭曲增强",
-                "effect_down": "值减小 → 扭曲减弱"
-            },
-            "shift_limit": {
-                "name": "偏移强度",
-                "description": "控制光学畸变的偏移强度。值越大，偏移越明显。",
-                "effect_up": "值增大 → 偏移增强",
-                "effect_down": "值减小 → 偏移减弱"
+                "description": "控制畸变的强度。值可以是正负，绝对值越大，图像扭曲越明显。",
+                "effect_up": "绝对值增大 → 扭曲增强",
+                "effect_down": "绝对值减小 → 扭曲减弱"
             },
             "scale": {
                 "name": "变形强度",
                 "description": "控制变形的强度。值越大，变形越明显。",
+                "effect_up": "值增大 → 变形增强",
+                "effect_down": "值减小 → 变形减弱"
+            },
+            "scale_range": {
+                "name": "变形强度范围",
+                "description": "控制薄板样条变形的强度范围（[0,1]）。值越大，变形越明显。",
                 "effect_up": "值增大 → 变形增强",
                 "effect_down": "值减小 → 变形减弱"
             },
@@ -457,9 +457,9 @@ class DegradationGUI:
                 "effect_up": "值增大 → 网格更密，变形更精细",
                 "effect_down": "值减小 → 网格更疏，变形更粗糙"
             },
-            "nb_points": {
+            "num_control_points": {
                 "name": "控制点数",
-                "description": "控制薄板样条的控制点数量。值越大，变形越精细。",
+                "description": "控制薄板样条的控制点数量（每边）。值越大，变形越精细。",
                 "effect_up": "值增大 → 变形更精细",
                 "effect_down": "值减小 → 变形更粗糙"
             }
@@ -469,7 +469,7 @@ class DegradationGUI:
             "ImageCompression": {
                 "class": A.ImageCompression,
                 "params": {
-                    "quality_range": {"type": "range", "min": 1, "max": 100, "default": (50, 80), "label": "质量范围"},
+                    "quality_range": {"type": "range_int", "min": 1, "max": 100, "default": (50, 80), "label": "质量范围"},
                     "compression_type": {"type": "choice", "options": ["jpeg", "webp"], "default": "jpeg", "label": "压缩类型"}
                 }
             },
@@ -482,8 +482,8 @@ class DegradationGUI:
             "GaussNoise": {
                 "class": A.GaussNoise,
                 "params": {
-                    "std_range": {"type": "range", "min": 0.0, "max": 50.0, "default": (5.0, 25.0), "label": "标准差范围"},
-                    "mean_range": {"type": "range", "min": -10.0, "max": 10.0, "default": (0.0, 0.0), "label": "均值范围"},
+                    "std_range": {"type": "range", "min": 0.0, "max": 1.0, "default": (0.1, 0.3), "label": "标准差范围"},
+                    "mean_range": {"type": "range", "min": -1.0, "max": 1.0, "default": (0.0, 0.0), "label": "均值范围"},
                     "per_channel": {"type": "bool", "default": False, "label": "每通道独立"}
                 }
             },
@@ -627,37 +627,36 @@ class DegradationGUI:
             "ElasticTransform": {
                 "class": A.ElasticTransform,
                 "params": {
-                    "alpha": {"type": "range", "min": 1.0, "max": 200.0, "default": (50.0, 150.0), "label": "弹性强度"},
-                    "sigma": {"type": "range", "min": 1.0, "max": 100.0, "default": (5.0, 15.0), "label": "平滑度"}
+                    "alpha": {"type": "range", "min": 0.0, "max": 200.0, "default": (1.0, 50.0), "label": "弹性强度"},
+                    "sigma": {"type": "range", "min": 1.0, "max": 100.0, "default": (10.0, 50.0), "label": "平滑度"}
                 }
             },
             "GridDistortion": {
                 "class": A.GridDistortion,
                 "params": {
-                    "num_steps": {"type": "range_int", "min": 3, "max": 15, "default": (5, 10), "label": "网格步数"},
-                    "distort_limit": {"type": "range", "min": 0.0, "max": 0.5, "default": (0.1, 0.3), "label": "畸变强度"}
+                    "num_steps": {"type": "range_int", "min": 1, "max": 15, "default": (5, 10), "label": "网格步数"},
+                    "distort_limit": {"type": "range", "min": -1.0, "max": 1.0, "default": (-0.3, 0.3), "label": "畸变强度"}
                 }
             },
             "OpticalDistortion": {
                 "class": A.OpticalDistortion,
                 "params": {
-                    "distort_limit": {"type": "range", "min": 0.0, "max": 0.5, "default": (0.05, 0.2), "label": "畸变强度"},
-                    "shift_limit": {"type": "range", "min": 0.0, "max": 0.2, "default": (0.0, 0.1), "label": "偏移强度"}
+                    "distort_limit": {"type": "range", "min": -0.3, "max": 0.3, "default": (-0.05, 0.05), "label": "畸变强度"}
                 }
             },
             "PiecewiseAffine": {
                 "class": A.PiecewiseAffine,
                 "params": {
                     "scale": {"type": "range", "min": 0.01, "max": 0.1, "default": (0.03, 0.05), "label": "变形强度"},
-                    "nb_rows": {"type": "range_int", "min": 3, "max": 10, "default": (4, 6), "label": "网格行数"},
-                    "nb_cols": {"type": "range_int", "min": 3, "max": 10, "default": (4, 6), "label": "网格列数"}
+                    "nb_rows": {"type": "range_int", "min": 2, "max": 10, "default": (4, 6), "label": "网格行数"},
+                    "nb_cols": {"type": "range_int", "min": 2, "max": 10, "default": (4, 6), "label": "网格列数"}
                 }
             },
             "ThinPlateSpline": {
                 "class": A.ThinPlateSpline,
                 "params": {
-                    "scale": {"type": "range", "min": 0.01, "max": 0.1, "default": (0.03, 0.05), "label": "变形强度"},
-                    "nb_points": {"type": "range_int", "min": 3, "max": 20, "default": (5, 10), "label": "控制点数"}
+                    "scale_range": {"type": "range", "min": 0.0, "max": 1.0, "default": (0.2, 0.4), "label": "变形强度"},
+                    "num_control_points": {"type": "range_int", "min": 2, "max": 10, "default": (3, 5), "label": "控制点数"}
                 }
             }
         }
@@ -1070,13 +1069,18 @@ class DegradationGUI:
                 val = var.get()
                 
                 if param_type == "range_int":
-                    val = int(val)
+                    val = int(round(val))  # 确保是整数
                     # 对于blur_limit，确保是奇数
                     if "blur" in param_name.lower() and val % 2 == 0:
                         val += 1
+                    # 确保在有效范围内
+                    val = max(param_config["min"], min(param_config["max"], val))
                     params[param_name] = (val, val)
                 else:
-                    params[param_name] = (float(val), float(val))
+                    val = float(val)
+                    # 确保在有效范围内
+                    val = max(param_config["min"], min(param_config["max"], val))
+                    params[param_name] = (val, val)
                         
             elif param_type == "choice":
                 params[param_name] = var.get()
@@ -1211,12 +1215,12 @@ class DegradationGUI:
                         min_val, max_val = max_val, min_val
                     
                     # 确保在有效范围内
-                    min_val = max(param_config["min"], min_val)
-                    max_val = min(param_config["max"], max_val)
+                    min_val = max(param_config["min"], min(param_config["max"], min_val))
+                    max_val = max(param_config["min"], min(param_config["max"], max_val))
                     
                     if param_type == "range_int":
-                        min_val = int(min_val)
-                        max_val = int(max_val)
+                        min_val = int(round(min_val))
+                        max_val = int(round(max_val))
                         # 对于blur_limit，确保是奇数
                         if "blur" in param_name.lower():
                             if min_val % 2 == 0:
@@ -1225,6 +1229,8 @@ class DegradationGUI:
                                 max_val += 1
                         range_params[param_name] = (min_val, max_val)
                     else:
+                        min_val = float(min_val)
+                        max_val = float(max_val)
                         range_params[param_name] = (float(min_val), float(max_val))
                         
                 except ValueError:
@@ -1243,11 +1249,9 @@ class DegradationGUI:
         import os
         save_dir = os.path.dirname(self.current_image_path)
         base_name = os.path.splitext(os.path.basename(self.current_image_path))[0]
-        algorithm_display_name = self.algorithm_names.get(algorithm_name, algorithm_name)
-        algorithm_safe_name = algorithm_name  # 使用内部名称作为文件夹名
         
-        # 创建子目录
-        output_dir = os.path.join(save_dir, f"{base_name}_{algorithm_safe_name}_samples")
+        # 创建子目录（使用图像名作为目录名）
+        output_dir = os.path.join(save_dir, base_name)
         os.makedirs(output_dir, exist_ok=True)
         
         # 生成并保存样本
@@ -1280,18 +1284,24 @@ class DegradationGUI:
             for i in range(sample_count):
                 # 生成随机参数
                 random_params = {}
+                param_values_for_filename = {}  # 用于文件名的参数值
                 for param_name, param_value in range_params.items():
                     if isinstance(param_value, tuple):
                         # 范围参数：随机选择
                         min_val, max_val = param_value
                         if isinstance(min_val, int):
                             random_val = np.random.randint(int(min_val), int(max_val) + 1)
+                            # 对于blur_limit，确保是奇数
+                            if "blur" in param_name.lower() and random_val % 2 == 0:
+                                random_val += 1
                         else:
                             random_val = np.random.uniform(min_val, max_val)
                         random_params[param_name] = (random_val, random_val)
+                        param_values_for_filename[param_name] = random_val
                     else:
                         # 固定参数
                         random_params[param_name] = param_value
+                        param_values_for_filename[param_name] = param_value
                 
                 # 创建变换对象
                 transform = algorithm_class(p=1.0, **random_params)
@@ -1310,9 +1320,60 @@ class DegradationGUI:
                 elif result_image.shape[2] == 4:
                     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGBA2RGB)
                 
-                # 保存图片
-                filename = f"{base_name}_{algorithm_safe_name}_{i+1:04d}.png"
+                # 构建文件名：原始图像名_参数a名称(值)_参数b名称(值)...（使用纯英文）
+                filename_parts = [base_name]
+                for param_name, param_val in sorted(param_values_for_filename.items()):
+                    # 使用英文参数名称（直接使用参数名，或从配置中获取英文标签）
+                    param_config = algorithm_config["params"].get(param_name, {})
+                    # 使用参数名本身作为英文名称（参数名已经是英文）
+                    param_label = param_name
+                    
+                    # 格式化参数值
+                    if isinstance(param_val, tuple):
+                        # 如果是元组，取第一个值（因为我们已经转换为(value, value)格式）
+                        param_val = param_val[0]
+                    
+                    if isinstance(param_val, (int, np.integer)):
+                        param_str = f"{param_label}({int(param_val)})"
+                    elif isinstance(param_val, (float, np.floating)):
+                        # 浮点数保留2位小数，去除末尾的0
+                        param_str = f"{param_label}({param_val:.2f})".rstrip('0').rstrip('.')
+                    elif isinstance(param_val, bool):
+                        param_str = f"{param_label}({str(param_val)})"
+                    else:
+                        param_str = f"{param_label}({str(param_val)})"
+                    
+                    # 清理文件名中的非法字符
+                    param_str = param_str.replace("/", "_").replace("\\", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace("\"", "_").replace("<", "_").replace(">", "_").replace("|", "_")
+                    filename_parts.append(param_str)
+                
+                filename_base = "_".join(filename_parts)
+                
+                # 如果文件名太长，截断（Windows限制255字符，保留扩展名）
+                max_filename_length = 200  # 留一些余量
+                extension = ".png"
+                if len(filename_base) > max_filename_length - len(extension):
+                    # 保留基础名称和扩展名，截断中间部分
+                    base_len = len(base_name) + len(extension)
+                    available_len = max_filename_length - base_len - 10  # 留10个字符的余量
+                    if available_len > 0:
+                        # 截断参数部分
+                        param_part = "_".join(filename_parts[1:])
+                        if len(param_part) > available_len:
+                            param_part = param_part[:available_len]
+                        filename_base = f"{base_name}_{param_part}"
+                    else:
+                        # 如果基础名称本身就很长，只保留基础名称
+                        filename_base = base_name[:max_filename_length - len(extension)]
+                
+                # 检查文件名是否已存在，如果存在则添加序号
+                filename = filename_base + extension
                 filepath = os.path.join(output_dir, filename)
+                counter = 1
+                while os.path.exists(filepath):
+                    filename = f"{filename_base}_{counter:03d}{extension}"
+                    filepath = os.path.join(output_dir, filename)
+                    counter += 1
                 
                 # 转换为BGR格式保存
                 if len(result_image.shape) == 3:
