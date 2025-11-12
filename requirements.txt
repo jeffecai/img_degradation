@@ -1,0 +1,17 @@
+# 图像退化算法GUI工具所需依赖
+
+# 核心依赖
+albucore>=0.0.1  # Albumentations核心库
+numpy>=1.21.0
+opencv-python>=4.5.0
+pydantic>=2.0.0
+scipy>=1.7.0
+typing-extensions>=4.0.0
+
+# GUI界面依赖
+Pillow>=8.0.0  # PIL图像处理库
+
+# 可选依赖（用于某些高级功能）
+# huggingface-hub>=0.10.0  # 如果需要使用Hub功能
+# torch>=1.9.0  # 如果需要使用PyTorch集成功能
+
