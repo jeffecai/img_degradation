@@ -716,191 +716,56 @@ class DegradationGUI:
                     effect_label.pack(anchor=tk.W, padx=(10, 0), pady=(2, 0))
             
             if param_type == "range":
-                # 范围滑块（支持固定值或范围值）
-                default_min = param_default[0] if isinstance(param_default, tuple) else param_default
-                default_max = param_default[1] if isinstance(param_default, tuple) else param_default
+                # 固定值滑块（简化版，只显示单个值）
+                default_value = param_default[0] if isinstance(param_default, tuple) else param_default
+                # 如果默认是范围，取中间值
+                if isinstance(param_default, tuple) and param_default[0] != param_default[1]:
+                    default_value = (param_default[0] + param_default[1]) / 2.0
                 
-                # 如果默认值相同，使用固定值模式；否则使用范围模式
-                use_fixed = (isinstance(param_default, tuple) and param_default[0] == param_default[1]) or (not isinstance(param_default, tuple))
+                var_value = tk.DoubleVar(value=default_value)
                 
-                var_use_range = tk.BooleanVar(value=not use_fixed)
-                var_value = tk.DoubleVar(value=default_min if use_fixed else default_min)
-                var_min = tk.DoubleVar(value=default_min)
-                var_max = tk.DoubleVar(value=default_max)
-                
-                # 模式选择（固定值/范围值）
-                mode_frame = ttk.Frame(self.param_frame)
-                mode_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(mode_frame, text="  模式:", width=10).pack(side=tk.LEFT)
-                mode_combo = ttk.Combobox(
-                    mode_frame,
-                    values=["固定值", "范围值"],
-                    state="readonly",
-                    width=10
-                )
-                mode_combo.current(1 if not use_fixed else 0)
-                mode_combo.pack(side=tk.LEFT, padx=5)
-                
-                def on_mode_change(event=None):
-                    if mode_combo.get() == "固定值":
-                        range_frame.pack_forget()
-                        fixed_frame.pack(fill=tk.X, pady=2)
-                        var_use_range.set(False)
-                    else:
-                        fixed_frame.pack_forget()
-                        range_frame.pack(fill=tk.X, pady=2)
-                        var_use_range.set(True)
-                
-                mode_combo.bind("<<ComboboxSelected>>", on_mode_change)
-                
-                # 固定值滑块
-                fixed_frame = ttk.Frame(self.param_frame)
-                if use_fixed:
-                    fixed_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(fixed_frame, text="  值:", width=10).pack(side=tk.LEFT)
-                scale_fixed = ttk.Scale(
-                    fixed_frame,
+                # 单个值滑块
+                value_frame = ttk.Frame(self.param_frame)
+                value_frame.pack(fill=tk.X, pady=2)
+                ttk.Label(value_frame, text="  值:", width=10).pack(side=tk.LEFT)
+                scale_value = ttk.Scale(
+                    value_frame,
                     from_=param_config["min"],
                     to=param_config["max"],
                     variable=var_value,
                     orient=tk.HORIZONTAL
                 )
-                scale_fixed.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-                label_fixed = ttk.Label(fixed_frame, textvariable=var_value, width=8)
-                label_fixed.pack(side=tk.LEFT)
+                scale_value.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+                label_value = ttk.Label(value_frame, textvariable=var_value, width=8)
+                label_value.pack(side=tk.LEFT)
                 
-                # 范围值滑块
-                range_frame = ttk.Frame(self.param_frame)
-                if not use_fixed:
-                    range_frame.pack(fill=tk.X, pady=2)
-                
-                min_frame = ttk.Frame(range_frame)
-                min_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(min_frame, text="  最小值:", width=10).pack(side=tk.LEFT)
-                scale_min = ttk.Scale(
-                    min_frame,
-                    from_=param_config["min"],
-                    to=param_config["max"],
-                    variable=var_min,
-                    orient=tk.HORIZONTAL
-                )
-                scale_min.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-                label_min = ttk.Label(min_frame, textvariable=var_min, width=8)
-                label_min.pack(side=tk.LEFT)
-                
-                max_frame = ttk.Frame(range_frame)
-                max_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(max_frame, text="  最大值:", width=10).pack(side=tk.LEFT)
-                scale_max = ttk.Scale(
-                    max_frame,
-                    from_=param_config["min"],
-                    to=param_config["max"],
-                    variable=var_max,
-                    orient=tk.HORIZONTAL
-                )
-                scale_max.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-                label_max = ttk.Label(max_frame, textvariable=var_max, width=8)
-                label_max.pack(side=tk.LEFT)
-                
-                self.param_vars[param_name] = {
-                    "use_range": var_use_range,
-                    "value": var_value,
-                    "min": var_min,
-                    "max": var_max
-                }
+                self.param_vars[param_name] = var_value
                 
             elif param_type == "range_int":
-                # 整数范围滑块（支持固定值或范围值）
-                default_min = param_default[0] if isinstance(param_default, tuple) else param_default
-                default_max = param_default[1] if isinstance(param_default, tuple) else param_default
+                # 固定值滑块（简化版，只显示单个值）
+                default_value = param_default[0] if isinstance(param_default, tuple) else param_default
+                # 如果默认是范围，取中间值
+                if isinstance(param_default, tuple) and param_default[0] != param_default[1]:
+                    default_value = int((param_default[0] + param_default[1]) / 2)
                 
-                use_fixed = (isinstance(param_default, tuple) and param_default[0] == param_default[1]) or (not isinstance(param_default, tuple))
+                var_value = tk.IntVar(value=int(default_value))
                 
-                var_use_range = tk.BooleanVar(value=not use_fixed)
-                var_value = tk.IntVar(value=int(default_min) if use_fixed else int(default_min))
-                var_min = tk.IntVar(value=int(default_min))
-                var_max = tk.IntVar(value=int(default_max))
-                
-                # 模式选择
-                mode_frame = ttk.Frame(self.param_frame)
-                mode_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(mode_frame, text="  模式:", width=10).pack(side=tk.LEFT)
-                mode_combo = ttk.Combobox(
-                    mode_frame,
-                    values=["固定值", "范围值"],
-                    state="readonly",
-                    width=10
-                )
-                mode_combo.current(1 if not use_fixed else 0)
-                mode_combo.pack(side=tk.LEFT, padx=5)
-                
-                def on_mode_change(event=None):
-                    if mode_combo.get() == "固定值":
-                        range_frame.pack_forget()
-                        fixed_frame.pack(fill=tk.X, pady=2)
-                        var_use_range.set(False)
-                    else:
-                        fixed_frame.pack_forget()
-                        range_frame.pack(fill=tk.X, pady=2)
-                        var_use_range.set(True)
-                
-                mode_combo.bind("<<ComboboxSelected>>", on_mode_change)
-                
-                # 固定值滑块
-                fixed_frame = ttk.Frame(self.param_frame)
-                if use_fixed:
-                    fixed_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(fixed_frame, text="  值:", width=10).pack(side=tk.LEFT)
-                scale_fixed = ttk.Scale(
-                    fixed_frame,
+                # 单个值滑块
+                value_frame = ttk.Frame(self.param_frame)
+                value_frame.pack(fill=tk.X, pady=2)
+                ttk.Label(value_frame, text="  值:", width=10).pack(side=tk.LEFT)
+                scale_value = ttk.Scale(
+                    value_frame,
                     from_=param_config["min"],
                     to=param_config["max"],
                     variable=var_value,
                     orient=tk.HORIZONTAL
                 )
-                scale_fixed.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-                label_fixed = ttk.Label(fixed_frame, textvariable=var_value, width=8)
-                label_fixed.pack(side=tk.LEFT)
+                scale_value.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+                label_value = ttk.Label(value_frame, textvariable=var_value, width=8)
+                label_value.pack(side=tk.LEFT)
                 
-                # 范围值滑块
-                range_frame = ttk.Frame(self.param_frame)
-                if not use_fixed:
-                    range_frame.pack(fill=tk.X, pady=2)
-                
-                min_frame = ttk.Frame(range_frame)
-                min_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(min_frame, text="  最小值:", width=10).pack(side=tk.LEFT)
-                scale_min = ttk.Scale(
-                    min_frame,
-                    from_=param_config["min"],
-                    to=param_config["max"],
-                    variable=var_min,
-                    orient=tk.HORIZONTAL
-                )
-                scale_min.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-                label_min = ttk.Label(min_frame, textvariable=var_min, width=8)
-                label_min.pack(side=tk.LEFT)
-                
-                max_frame = ttk.Frame(range_frame)
-                max_frame.pack(fill=tk.X, pady=2)
-                ttk.Label(max_frame, text="  最大值:", width=10).pack(side=tk.LEFT)
-                scale_max = ttk.Scale(
-                    max_frame,
-                    from_=param_config["min"],
-                    to=param_config["max"],
-                    variable=var_max,
-                    orient=tk.HORIZONTAL
-                )
-                scale_max.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-                label_max = ttk.Label(max_frame, textvariable=var_max, width=8)
-                label_max.pack(side=tk.LEFT)
-                
-                self.param_vars[param_name] = {
-                    "use_range": var_use_range,
-                    "value": var_value,
-                    "min": var_min,
-                    "max": var_max
-                }
+                self.param_vars[param_name] = var_value
                 
             elif param_type == "choice":
                 # 下拉选择
@@ -1102,66 +967,17 @@ class DegradationGUI:
                 continue
                 
             if param_type in ["range", "range_int"]:
-                # 范围参数（支持固定值或范围值）
-                if isinstance(var, dict):
-                    # 新模式：支持固定值或范围值
-                    use_range = var["use_range"].get()
-                    if use_range:
-                        min_val = var["min"].get()
-                        max_val = var["max"].get()
-                        # 确保min <= max
-                        if min_val > max_val:
-                            min_val, max_val = max_val, min_val
-                        
-                        # 对于整数范围，确保是奇数（对于blur_limit）
-                        if param_type == "range_int" and "blur" in param_name.lower():
-                            min_val = int(min_val)
-                            max_val = int(max_val)
-                            if min_val % 2 == 0:
-                                min_val += 1
-                            if max_val % 2 == 0:
-                                max_val += 1
-                            params[param_name] = (min_val, max_val)
-                        else:
-                            if param_type == "range_int":
-                                params[param_name] = (int(min_val), int(max_val))
-                            else:
-                                params[param_name] = (float(min_val), float(max_val))
-                    else:
-                        # 固定值模式：使用单个值，转换为(min, max)格式
-                        val = var["value"].get()
-                        if param_type == "range_int":
-                            val = int(val)
-                            # 对于blur_limit，确保是奇数
-                            if "blur" in param_name.lower() and val % 2 == 0:
-                                val += 1
-                            params[param_name] = (val, val)
-                        else:
-                            params[param_name] = (float(val), float(val))
+                # 固定值参数：将单个值转换为(min, max)格式（Albumentations需要范围）
+                val = var.get()
+                
+                if param_type == "range_int":
+                    val = int(val)
+                    # 对于blur_limit，确保是奇数
+                    if "blur" in param_name.lower() and val % 2 == 0:
+                        val += 1
+                    params[param_name] = (val, val)
                 else:
-                    # 旧模式兼容（向后兼容）
-                    var_min, var_max = var
-                    min_val = var_min.get()
-                    max_val = var_max.get()
-                    
-                    # 确保min <= max
-                    if min_val > max_val:
-                        min_val, max_val = max_val, min_val
-                    
-                    # 对于整数范围，确保是奇数（对于blur_limit）
-                    if param_type == "range_int" and "blur" in param_name.lower():
-                        min_val = int(min_val)
-                        max_val = int(max_val)
-                        if min_val % 2 == 0:
-                            min_val += 1
-                        if max_val % 2 == 0:
-                            max_val += 1
-                        params[param_name] = (min_val, max_val)
-                    else:
-                        if param_type == "range_int":
-                            params[param_name] = (int(min_val), int(max_val))
-                        else:
-                            params[param_name] = (float(min_val), float(max_val))
+                    params[param_name] = (float(val), float(val))
                         
             elif param_type == "choice":
                 params[param_name] = var.get()
